@@ -201,6 +201,7 @@ def send_email(subject, body):
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {RESEND_API_KEY}",
+            "User-Agent": "EleutherDigest/1.0",
         },
     )
     try:
