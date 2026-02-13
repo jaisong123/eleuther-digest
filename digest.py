@@ -16,7 +16,9 @@ from datetime import datetime, timedelta, timezone
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_REPO = os.environ.get("GITHUB_REPO", "")  # e.g. "jaisongeorge/eleuther-digest"
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+EMAIL_TO = os.environ.get("EMAIL_TO", "jaison.sunny.george@gmail.com")
 
 CHANNEL_ID = "730095596861521970"  # EleutherAI #off-topic
 GUILD_ID = "729741769192767510"
@@ -182,6 +184,30 @@ def post_digest(subject, body):
     print(f"Posted: {result['html_url']}")
 
 
+# ── Email via Resend (backup) ──
+def send_email(subject, body):
+    if not RESEND_API_KEY:
+        return
+    payload = {
+        "from": "EleutherAI Digest <digest@resend.dev>",
+        "to": [EMAIL_TO],
+        "subject": subject,
+        "text": body,
+    }
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+        },
+    )
+    with urllib.request.urlopen(req) as resp:
+        result = json.loads(resp.read())
+    print(f"Email sent to {EMAIL_TO}")
+
+
 # ── Main ──
 def main():
     # 1. Export
@@ -202,6 +228,7 @@ def main():
     # 3. Email
     subject = f"EleutherAI Alpha Digest — {date_str} ({len(messages)} msgs)"
     post_digest(subject, analysis)
+    send_email(subject, analysis)
 
     # 4. Also save locally if running manually
     if "GITHUB_ACTIONS" not in os.environ:
