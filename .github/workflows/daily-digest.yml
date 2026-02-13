@@ -5,6 +5,9 @@ on:
     - cron: '0 8 * * *'  # 8am UTC / 2am CST
   workflow_dispatch:       # manual trigger
 
+permissions:
+  issues: write
+
 jobs:
   digest:
     runs-on: ubuntu-latest
