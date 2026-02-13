@@ -1,15 +1,47 @@
-name: Daily EleutherAI Alpha Digest
+name: Discord Alpha Digest
 
 on:
   schedule:
-    - cron: '0 8 * * *'  # 8am UTC / 2am CST
-  workflow_dispatch:       # manual trigger
+    - cron: '0 8 * * *'        # Daily: 8am UTC / 2am CST
+    - cron: '0 9 * * 0'        # Weekly: Sunday 9am UTC / 3am CST
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: false
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - weekly
 
 permissions:
   issues: write
 
 jobs:
-  digest:
+  daily:
+    if: github.event.schedule == '0 8 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'daily')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run daily digest (all channels)
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: python digest.py daily
+
+  weekly:
+    if: github.event.schedule == '0 9 * * 0' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'weekly')
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -20,11 +52,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run digest
+      - name: Run weekly rollup
         env:
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO: ${{ github.repository }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-        run: python digest.py
+        run: python digest.py weekly
