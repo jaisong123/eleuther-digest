@@ -43,15 +43,18 @@ RULES:
 - If a section has nothing, write "Nothing today." One line.
 - NEVER repeat a point.
 
+EVERY bullet MUST include a direct quote from the chat as evidence. Format:
+<b>Takeaway</b> — Context. As user_x put it: "exact quote from the log."
+
 EXAMPLES OF GOOD BULLETS:
-- <b>vllm_mlx is replacing ollama for local model checks</b> — 3 independent users switched this week, citing faster iteration loops before cloud deploy.
-- <b>Codex is hemorrhaging power users to Claude Code</b> — Multiple reports of Codex deleting working code and hallucinating TODOs. Quality decline accelerated in last 2 weeks.
-- <b>DeepSeek R1 reproduction attempt hit a wall on expert routing</b> — User implementing from scratch found their MoE load balancing diverges after 10K steps. No fix yet.
+- <b>vllm_mlx is replacing ollama for local model checks</b> — 3 users switched this week. As cat_developer put it: "ollama is too slow for iteration, vllm_mlx just works."
+- <b>Codex is hemorrhaging power users to Claude Code</b> — Multiple reports of deleted code and hallucinated TODOs. jerry0478: "codex just removed my entire auth module and replaced it with a TODO."
+- <b>DeepSeek R1 reproduction hit a wall on expert routing</b> — MoE load balancing diverges after 10K steps. nruaif: "the routing just collapses, all tokens go to 2 experts."
 
 EXAMPLES OF BAD BULLETS (do NOT write like this):
-- "Users are switching to vllm_mlx for inference." (no "so what", no evidence)
-- "Interest in SNNs remains limited." (vague, no one cares)
-- "Concerns about safety researchers leaving." (who? where? why does it matter?)
+- "Users are switching to vllm_mlx for inference." (no quote, no "so what")
+- "Interest in SNNs remains limited." (vague, no evidence, no names)
+- "Codex's quality is questioned, with users reporting issues." (generic, no quote, who said what?)
 
 DATA: {msg_count} messages from EleutherAI #off-topic on {date_str}. These are ML researchers and infra engineers who ship.
 
