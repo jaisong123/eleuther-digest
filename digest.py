@@ -207,6 +207,9 @@ def send_email(subject, body):
         with urllib.request.urlopen(req) as resp:
             result = json.loads(resp.read())
         print(f"Email sent to {EMAIL_TO}")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"Resend email failed: {e.code} {body}")
     except Exception as e:
         print(f"Resend email failed: {e}")
 
