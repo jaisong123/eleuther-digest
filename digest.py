@@ -7,6 +7,7 @@ Zero external dependencies — stdlib only + REST APIs.
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -32,49 +33,49 @@ DISCORD_HEADERS = {
     "Referer": f"https://discord.com/channels/{GUILD_ID}/{CHANNEL_ID}",
 }
 
-PROMPT = """## ROLE
-You are a sharp, direct intelligence analyst writing for a busy technical executive who skips anything that doesn't answer "so what?" in the first sentence.
+PROMPT = """You are a sharp intelligence analyst writing a daily brief for a busy exec. They will skim this in 60 seconds. Every word must earn its place.
 
-## HARD RULES
-- ENTIRE response under 800 words. Respect the reader's time.
-- NEVER repeat a point. Each insight is unique.
-- Skip social chatter, memes, complaints, off-topic banter.
-- If a section has no signal, write "Nothing today." and move on.
+RULES:
+- Under 800 words total.
+- EVERY bullet MUST start with a bold actionable takeaway, then a dash, then 1-2 sentences of evidence. NO EXCEPTIONS.
+- Format: <b>Takeaway that answers "so what?"</b> — Evidence from the chat with specific names/tools/numbers.
+- If you can't explain why someone should care, cut the bullet.
+- If a section has nothing, write "Nothing today." One line.
+- NEVER repeat a point.
 
-## WRITING STYLE — Minto Pyramid
-For EVERY signal, lead with the takeaway. Structure each bullet as:
-**[TAKEAWAY in bold]** — then the evidence/context in 1-2 sentences. The bold part alone should be scannable and useful.
+EXAMPLES OF GOOD BULLETS:
+- <b>vllm_mlx is replacing ollama for local model checks</b> — 3 independent users switched this week, citing faster iteration loops before cloud deploy.
+- <b>Codex is hemorrhaging power users to Claude Code</b> — Multiple reports of Codex deleting working code and hallucinating TODOs. Quality decline accelerated in last 2 weeks.
+- <b>DeepSeek R1 reproduction attempt hit a wall on expert routing</b> — User implementing from scratch found their MoE load balancing diverges after 10K steps. No fix yet.
 
-Bad: "Users are switching to vllm_mlx for inference."
-Good: "**vllm_mlx emerging as the go-to for local model validation** — multiple users independently adopting it over ollama for quick model checks before deploying to cloud."
+EXAMPLES OF BAD BULLETS (do NOT write like this):
+- "Users are switching to vllm_mlx for inference." (no "so what", no evidence)
+- "Interest in SNNs remains limited." (vague, no one cares)
+- "Concerns about safety researchers leaving." (who? where? why does it matter?)
 
-Bad: "Consensus that Codex is becoming unusable."
-Good: "**Codex quality is in freefall** — power users reporting it removes working code, inserts hallucinated TODOs, and has gotten measurably worse in the last 2 weeks. Some switching to Claude Code."
-
-## DATA
-{msg_count} messages from EleutherAI #off-topic on {date_str}. These are ML researchers, infra engineers, and open-source contributors — people who ship.
+DATA: {msg_count} messages from EleutherAI #off-topic on {date_str}. These are ML researchers and infra engineers who ship.
 
 {messages}
 
-## OUTPUT — Lead with the single biggest signal of the day.
+OUTPUT (use these exact section headers):
 
-### TL;DR
-One sentence. The single most important thing from today. Bold it.
+TL;DR
+One bold sentence. The single most important signal today. Why it matters.
 
-### Tooling Moves
-What tools/frameworks are people actually migrating to or abandoning? Only real switches, not drive-by mentions.
+TOOLING MOVES
+Real migrations — tools people are actually switching to or abandoning.
 
-### Sentiment Shifts
-Where has the hivemind flipped on a lab, model, or architecture? What's gaining or losing credibility?
+SENTIMENT SHIFTS
+Where the hivemind flipped on a lab, model, or architecture. What's gaining or losing credibility and why.
 
-### Research Going Live
-Papers people are actually implementing, reproducing, or failing to reproduce. Not just links — real implementation discussion.
+RESEARCH GOING LIVE
+Papers being implemented or reproduced. Specific details on what worked, what failed.
 
-### Talent & Org Signals
-Brain drain, team dysfunction, hiring freezes, morale shifts at major labs.
+TALENT & ORG SIGNALS
+Brain drain, team dysfunction, morale shifts at specific labs.
 
-### Links Worth Clicking
-Repos, posts, or tools that sparked real discussion (not just a link dump)."""
+LINKS WORTH CLICKING
+Repos, posts, or tools that sparked real discussion. Include the URL and why it matters."""
 
 
 # ── Discord Export ──
@@ -184,15 +185,67 @@ def post_digest(subject, body):
     print(f"Posted: {result['html_url']}")
 
 
-# ── Email via Resend (backup) ──
+# ── Markdown to HTML ──
+def md_to_html(text):
+    """Convert the subset of markdown Gemini outputs to clean HTML email."""
+    lines = text.split("\n")
+    html_lines = []
+    in_list = False
+    for line in lines:
+        stripped = line.strip()
+        # Section headers
+        if stripped.startswith("### "):
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            html_lines.append(f'<h3 style="color:#1a1a2e;margin:18px 0 8px 0;font-size:16px">{stripped[4:]}</h3>')
+        elif stripped.startswith("## "):
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            html_lines.append(f'<h2 style="color:#1a1a2e;margin:20px 0 10px 0;font-size:18px">{stripped[3:]}</h2>')
+        # Bullet points
+        elif stripped.startswith("* ") or stripped.startswith("- "):
+            if not in_list:
+                html_lines.append('<ul style="padding-left:20px">')
+                in_list = True
+            content = stripped[2:]
+            # Convert **bold** to <b>bold</b>
+            content = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', content)
+            # Convert [text](url) to <a>
+            content = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', content)
+            html_lines.append(f'<li style="margin:6px 0">{content}</li>')
+        elif stripped == "":
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            html_lines.append("<br>")
+        else:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            # Convert inline **bold**
+            converted = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', stripped)
+            converted = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', converted)
+            html_lines.append(f'<p style="margin:4px 0">{converted}</p>')
+    if in_list:
+        html_lines.append("</ul>")
+    body_html = "\n".join(html_lines)
+    return f'''<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;max-width:600px;line-height:1.5;color:#222">
+{body_html}
+</div>'''
+
+
+# ── Email via Resend ──
 def send_email(subject, body):
     if not RESEND_API_KEY:
         return
+    html = md_to_html(body)
     payload = {
         "from": "EleutherAI Digest <onboarding@resend.dev>",
         "to": [EMAIL_TO],
         "subject": subject,
-        "text": body,
+        "html": html,
     }
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
