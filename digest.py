@@ -189,7 +189,7 @@ def send_email(subject, body):
     if not RESEND_API_KEY:
         return
     payload = {
-        "from": "EleutherAI Digest <digest@resend.dev>",
+        "from": "EleutherAI Digest <onboarding@resend.dev>",
         "to": [EMAIL_TO],
         "subject": subject,
         "text": body,
@@ -203,9 +203,12 @@ def send_email(subject, body):
             "Authorization": f"Bearer {RESEND_API_KEY}",
         },
     )
-    with urllib.request.urlopen(req) as resp:
-        result = json.loads(resp.read())
-    print(f"Email sent to {EMAIL_TO}")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+        print(f"Email sent to {EMAIL_TO}")
+    except Exception as e:
+        print(f"Resend email failed: {e}")
 
 
 # ── Main ──
