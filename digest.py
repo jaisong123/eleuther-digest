@@ -431,9 +431,8 @@ def run_daily():
         subject = f"{cfg['email_subject']} — {date_str} ({len(messages)} msgs)"
         post_issue(subject, analysis, ["digest", cfg["label"]])
 
-        # Only email daily channels immediately
-        if cfg["cadence"] == "daily":
-            send_email(subject, analysis, cfg["email_subject"])
+        # Email every channel's digest
+        send_email(subject, analysis, cfg["email_subject"])
 
         time.sleep(2)  # be nice between channels
 
